@@ -99,144 +99,226 @@ def save_layers(model, model_name, epoch, blocks, filename='checkpoint.pth.tar',
 
 class MultiLayer(nn.Module):
     """
-       MultiLayer Network created from list of preset blocks
+    MultiLayer类是一个自定义的神经网络模型，它由预设的块列表创建。
+
+    参数:
+    blocks_params: dict, 块的参数字典
+    blocks: nn.Module, 块的模块，如果没有提供，则会根据blocks_params生成
     """
 
     def __init__(self, blocks_params: dict, blocks: nn.Module = None) -> None:
-        super().__init__()
-        self.train_mode = None
-        self.train_blocks = []
+        """
+        初始化函数，创建MultiLayer对象。
 
-        self.config = blocks_params
-        if blocks_params is not None:
-            blocks = []
-            for _, params in blocks_params.items():
-                blocks.append(generate_block(params))
-            self.blocks = nn.Sequential(*blocks)
-        else:
-            self.blocks = nn.Sequential(*blocks)
+        参数:
+        blocks_params: dict, 块的参数字典
+        blocks: nn.Module, 块的模块，如果没有提供，则会根据blocks_params生成
+        """
+        super().__init__()
+        self.train_mode = None  # 训练模式
+        self.train_blocks = []  # 训练块列表
+
+        self.config = blocks_params  # 块的配置参数
+        if blocks_params is not None:  # 如果提供了块的参数
+            blocks = []  # 初始化块列表
+            for _, params in blocks_params.items():  # 遍历每个块的参数
+                blocks.append(generate_block(params))  # 生成块并添加到列表
+            self.blocks = nn.Sequential(*blocks)  # 将块列表转换为序列
+        else:  # 如果没有提供块的参数
+            self.blocks = nn.Sequential(*blocks)  # 直接将提供的块转换为序列
 
     def foward_x_wta(self, x: torch.Tensor) -> torch.Tensor:
-        for id, block in self.generator_block():
-            if id != len(self.blocks) - 1:
-                x = block(x)
-            else:
-                return block.foward_x_wta(x)
+        """
+        对输入x进行前向传播，并返回最后一个块的输出。
+
+        参数:
+        x: torch.Tensor, 输入张量
+
+        返回:
+        torch.Tensor, 最后一个块的输出
+        """
+        for id, block in self.generator_block():  # 遍历每个块
+            if id != len(self.blocks) - 1:  # 如果不是最后一个块
+                x = block(x)  # 对x进行处理
+            else:  # 如果是最后一个块
+                return block.foward_x_wta(x)  # 返回最后一个块的输出
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.blocks(x)
-        return x
+        """
+        对输入x进行前向传播，并返回最后一个块的输出。
+
+        参数:
+        x: torch.Tensor, 输入张量
+
+        返回:
+        torch.Tensor, 最后一个块的输出
+        """
+        x = self.blocks(x)  # 对x进行处理
+        return x  # 返回处理后的结果
 
     def get_block(self, id):
+        """
+        获取指定id的块。
+
+        参数:
+        id: int, 块的id
+
+        返回:
+        nn.Module, 指定id的块
+        """
         return self.blocks[id]
 
     def sub_model(self, block_ids):
-        sub_blocks = []
-        max_id = max(block_ids)
-        for id, block in self.generator_block():
-            sub_blocks.append(self.get_block(id))
-            if id == max_id:
-                break
+        """
+        获取一个子模型，该子模型包含了从第一个块到指定id的块。
 
-        return MultiLayer(None, sub_blocks)
+        参数:
+        block_ids: list, 块的id列表
+
+        返回:
+        MultiLayer, 子模型
+        """
+        sub_blocks = []  # 初始化子块列表
+        max_id = max(block_ids)  # 获取最大的id
+        for id, block in self.generator_block():  # 遍历每个块
+            sub_blocks.append(self.get_block(id))  # 将块添加到子块列表
+            if id == max_id:  # 如果达到了最大的id
+                break  # 结束循环
+
+        return MultiLayer(None, sub_blocks)  # 返回子模型
 
     def is_hebbian(self) -> bool:
         """
-        Return if the last block of the model is hebbian
+        判断最后一个块是否是Hebbian块。
+
+        返回:
+        bool, 如果最后一个块是Hebbian块，则返回True，否则返回False
         """
         return self.blocks[-1].is_hebbian()
 
     def get_lr(self) -> float:
         """
-        Return the lr of the last hebbian block
+        获取最后一个Hebbian块的学习率。
+
+        返回:
+        float, 最后一个Hebbian块的学习率
         """
-        if self.train_blocks:
-            for i in reversed(self.train_blocks):
-                if self.blocks[-i].is_hebbian():
-                    return self.blocks[-i].get_lr()
-        if self.blocks[0].is_hebbian():
-            return self.blocks[0].get_lr()
-        return 0
+        if self.train_blocks:  # 如果有训练块
+            for i in reversed(self.train_blocks):  # 从后往前遍历训练块
+                if self.blocks[-i].is_hebbian():  # 如果是Hebbian块
+                    return self.blocks[-i].get_lr()  # 返回学习率
+        if self.blocks[0].is_hebbian():  # 如果第一个块是Hebbian块
+            return self.blocks[0].get_lr()  # 返回学习率
+        return 0  # 如果没有Hebbian块，返回0
 
     def radius(self, layer=None) -> str:
         """
-        Return the radius of the first hebbian block
+        获取第一个Hebbian块的半径。
+
+        参数:
+        layer: int, 层的id，如果提供，则返回该层的半径，否则返回第一个Hebbian块的半径
+
+        返回:
+        str, 第一个Hebbian块的半径
         """
-        if layer is not None:
-            return self.blocks[layer].radius()
-        if self.train_blocks:
-            r = []
-            for i in reversed(self.train_blocks):
-                if self.blocks[i].is_hebbian():
-                    r.append(self.blocks[i].radius())
-            return '\n ************************************************************** \n'.join(r)
-        if self.blocks[0].is_hebbian():
-            return self.blocks[0].radius()
-        return ''
+        if layer is not None:  # 如果提供了层的id
+            return self.blocks[layer].radius()  # 返回该层的半径
+        if self.train_blocks:  # 如果有训练块
+            r = []  # 初始化半径列表
+            for i in reversed(self.train_blocks):  # 从后往前遍历训练块
+                if self.blocks[i].is_hebbian():  # 如果是Hebbian块
+                    r.append(self.blocks[i].radius())  # 将半径添加到列表
+            return '\n ************************************************************** \n'.join(r)  # 返回半径列表
+        if self.blocks[0].is_hebbian():  # 如果第一个块是Hebbian块
+            return self.blocks[0].radius()  # 返回半径
+        return ''  # 如果没有Hebbian块，返回空字符串
 
     def convergence(self) -> str:
         """
-        Return the radius of the last hebbian block
+        获取最后一个Hebbian块的收敛情况。
+
+        返回:
+        str, 最后一个Hebbian块的收敛情况
         """
-        for i in range(1, len(self.blocks) + 1):
-            if self.blocks[-i].is_hebbian():
-                return self.blocks[-i].layer.convergence()
-        return 0, 0
+        for i in range(1, len(self.blocks) + 1):  # 从后往前遍历每个块
+            if self.blocks[-i].is_hebbian():  # 如果是Hebbian块
+                return self.blocks[-i].layer.convergence()  # 返回收敛情况
+        return 0, 0  # 如果没有Hebbian块，返回(0, 0)
 
     def reset(self):
-        if self.blocks[0].is_hebbian():
-            self.blocks[0].layer.reset()
+        """
+        重置第一个Hebbian块。
+        """
+        if self.blocks[0].is_hebbian():  # 如果第一个块是Hebbian块
+            self.blocks[0].layer.reset()  # 重置第一个块
 
     def generator_block(self):
-        for id, block in enumerate(self.blocks):
-            yield id, block
+        """
+        生成一个块的生成器，可以用于遍历所有的块。
+
+        返回:
+        generator, 块的生成器
+        """
+        for id, block in enumerate(self.blocks):  # 遍历每个块
+            yield id, block  # 返回块的id和块
 
     def update(self):
-        for block in self.train_blocks:
-            self.get_block(block).update()
+        """
+        更新所有的训练块。
+        """
+        for block in self.train_blocks:  # 遍历每个训练块
+            self.get_block(block).update()  # 更新块
 
     def __str__(self):
-        for _, block in self.generator_block():
-            block.__str__()
+        """
+        返回模型的字符串表示。
+
+        返回:
+        str, 模型的字符串表示
+        """
+        for _, block in self.generator_block():  # 遍历每个块
+            block.__str__()  # 返回块的字符串表示
 
     def train(self, mode=True, blocks=[]):
         """
-        Set the learning update to the expected mode.
-        mode:True, BP:False, HB:True --> training Hebbian layer
-        mode:True, BP:True, HB:False --> training fc
-        mode:True, BP:True, HB:True --> training Hebbain + fc blocks
-        mode:False --> predict
+        设置模型的训练模式和训练块。
+
+        参数:
+        mode: bool, 训练模式，如果为True，则为训练模式，如果为False，则为预测模式
+        blocks: list, 训练块的列表
         """
-        self.training = mode
-        self.train_blocks = blocks
-        # print('train mode %s and layer %s'%(mode, blocks))
+        self.training = mode  # 设置训练模式
+        self.train_blocks = blocks  # 设置训练块
 
-        for param in self.parameters():
-            param.requires_grad = False
-        for _, block in self.generator_block():
-            block.eval()
+        for param in self.parameters():  # 遍历每个参数
+            param.requires_grad = False  # 设置参数不需要梯度
+        for _, block in self.generator_block():  # 遍历每个块
+            block.eval()  # 设置块为评估模式
 
-        for block in blocks:
-            module = self.get_block(block)
+        for block in blocks:  # 遍历每个训练块
+            module = self.get_block(block)  # 获取块
 
-            module.train(mode)
-            for param in module.parameters():
-                param.requires_grad = True
+            module.train(mode)  # 设置块的训练模式
+            for param in module.parameters():  # 遍历块的每个参数
+                param.requires_grad = True  # 设置参数需要梯度
 
 
 class HebbianOptimizer:
     def __init__(self, model):
-        """Custom optimizer which particularly delegates weight updates of Unsupervised layers to these layers themselves.
+        """
+        HebbianOptimizer是一个自定义的优化器，特别将无监督层的权重更新委托给这些层本身。
 
-        Args:
-            model (torch.nn.Module): Pytorch model
+        参数:
+        model (torch.nn.Module): Pytorch模型
         """
         self.model = model
         self.param_groups = []
 
     @torch.no_grad()
     def step(self, *args):
-        """Performs a single optimization step.
+        """
+        执行一步优化。这个方法首先遍历模型中的所有块，如果块是Hebbian块（即无监督层），则调用该块的`update`方法进行更新。
+        这个方法使用了`torch.no_grad()`装饰器，表示在执行这个方法时不需要计算梯度，这是因为Hebbian学习规则通常不需要梯度下降。
         """
         loss = None
 
@@ -245,15 +327,19 @@ class HebbianOptimizer:
                 block.update(*args)
 
     def zero_grad(self):
+        """
+        这个方法什么也没做，因为在Hebbian学习中，我们不需要重置梯度。
+        """
         pass
 
 
 class AggregateOptim:
     def __init__(self, optimizers):
-        """Custom optimizer aggregating several optimizers together to run simulaneously
+        """
+        自定义优化器，将多个优化器聚合在一起以同时运行。
 
-        Args:
-            optimizers (List[torch.autograd.optim.Optimizer]): List of optimizers which need to be called simultaneously
+        参数:
+        optimizers (List[torch.autograd.optim.Optimizer]): 需要同时调用的优化器列表
         """
         self.optimizers = optimizers
         self.param_groups = []
@@ -261,15 +347,27 @@ class AggregateOptim:
             self.param_groups.extend(optim.param_groups)
 
     def __repr__(self):
+        """
+        返回优化器的字符串表示。
+
+        返回:
+        str, 优化器的字符串表示
+        """
         representations = []
         for optim in self.optimizers:
             representations.append(repr(optim))
         return '\n'.join(representations)
 
     def step(self):
+        """
+        执行一步优化，调用所有优化器的step方法。
+        """
         for optim in self.optimizers:
             optim.step()
 
     def zero_grad(self):
+        """
+        重置所有优化器的梯度。
+        """
         for optim in self.optimizers:
             optim.zero_grad()
