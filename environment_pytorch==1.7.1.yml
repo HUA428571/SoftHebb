@@ -1,9 +1,9 @@
 name: softhebb
 channels:
   - pytorch
-  - fastchan
+  # - fastchan
   - conda-forge
-  - defaults
+  # - defaults
 dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=4.5=1_gnu
@@ -304,4 +304,4 @@ dependencies:
     - efficientnet-pytorch==0.7.1
     - kmeans-pytorch==0.3
     - torchsummary==1.5.1
-prefix: /home/username/anaconda3/envs/softhebb # if this path cannot be found, it will be installed under anaconda dir
+# prefix: /home/username/anaconda3/envs/softhebb # if this path cannot be found, it will be installed under anaconda dir
