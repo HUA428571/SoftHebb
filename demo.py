@@ -265,11 +265,11 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()  # 定义损失函数
 
     # 加载CIFAR10训练集和测试集
-    trainset = FastCIFAR10('./data', train=True, download=True)
+    trainset = FastCIFAR10('/data/hwj/dataset', train=True, download=True)
     unsup_trainloader = torch.utils.data.DataLoader(trainset, batch_size=10, shuffle=True)
     sup_trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
 
-    testset = FastCIFAR10('./data', train=False)
+    testset = FastCIFAR10('/data/hwj/dataset', train=False)
     testloader = torch.utils.data.DataLoader(testset, batch_size=1000, shuffle=False)
 
     # 无监督训练阶段
